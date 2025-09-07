@@ -1,0 +1,17 @@
+{
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "pigeon-track",
+          "configurations": {
+            "web": "1:987564481900:web:269a54dbcfb8d23741e749"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
