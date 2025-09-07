@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 import '../services/auth_service.dart';
+import '../utils/responsive_utils.dart';
 import 'login_screen.dart';
 import 'tournaments_screen.dart';
 import 'results_screen.dart';
@@ -95,36 +96,36 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLargeScreen = MediaQuery.of(context).size.width > 1024;
+    final shouldUseDrawer = ResponsiveUtils.shouldUseDrawer(context);
 
     return Scaffold(
-      body: Row(
-        children: [
-          // Sidebar
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: _isCollapsed
-                ? 80
-                : isLargeScreen
-                ? 280
-                : 240,
-            child: _buildSidebar(isLargeScreen),
-          ),
-          // Main content
-          Expanded(
-            child: Column(
+      appBar: shouldUseDrawer ? _buildMobileAppBar() : null,
+      drawer: shouldUseDrawer ? _buildMobileDrawer() : null,
+      body: shouldUseDrawer
+          ? _pages[_selectedIndex]
+          : Row(
               children: [
-                _buildTopBar(),
-                Expanded(child: _pages[_selectedIndex]),
+                // Desktop Sidebar
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: ResponsiveUtils.getSidebarWidth(context, _isCollapsed),
+                  child: _buildSidebar(),
+                ),
+                // Main content
+                Expanded(
+                  child: Column(
+                    children: [
+                      _buildTopBar(),
+                      Expanded(child: _pages[_selectedIndex]),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildSidebar(bool isLargeScreen) {
+  Widget _buildSidebar() {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.primary,
@@ -355,6 +356,99 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                   },
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  AppBar _buildMobileAppBar() {
+    return AppBar(
+      title: const Text(
+        'Pigeon Track',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+      backgroundColor: AppColors.primary,
+      iconTheme: const IconThemeData(color: Colors.white),
+      elevation: 2,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: _handleLogout,
+          tooltip: 'Logout',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileDrawer() {
+    return Drawer(
+      child: Container(
+        color: AppColors.primary,
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(24),
+              child: const Column(
+                children: [
+                  SizedBox(height: 40), // Status bar padding
+                  Icon(Icons.pets, size: 48, color: Colors.white),
+                  SizedBox(height: 12),
+                  Text(
+                    'Sadaat Rajput Butt Pigeon Club Sarsaal',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white24, height: 1),
+            // Navigation items
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: _navigationItems.length,
+                itemBuilder: (context, index) {
+                  final item = _navigationItems[index];
+                  final isSelected = _selectedIndex == index;
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.white.withOpacity(0.1) : null,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListTile(
+                      leading: Icon(item.icon, color: Colors.white, size: 24),
+                      title: Text(
+                        item.label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        setState(() {
+                          _selectedIndex = index;
+                        });
+                        Navigator.of(context).pop(); // Close drawer
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),

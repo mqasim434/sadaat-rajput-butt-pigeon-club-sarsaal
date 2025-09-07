@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
+import '../utils/responsive_utils.dart';
 import 'tournament_details_screen.dart';
 
 /// Tournaments screen with grid layout of tournament cards
@@ -19,16 +20,25 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: ResponsiveUtils.getResponsivePadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Tournaments',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: ResponsiveUtils.getResponsiveFontSize(
+                      context,
+                      mobile: 20,
+                      tablet: 22,
+                      desktop: 24,
+                      base: 24,
+                    ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 ElevatedButton.icon(
                   onPressed: _showCreateTournamentDialog,
@@ -79,16 +89,26 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
 
                   return LayoutBuilder(
                     builder: (context, constraints) {
-                      final crossAxisCount = _getCrossAxisCount(
-                        constraints.maxWidth,
+                      final crossAxisCount = ResponsiveUtils.getGridColumns(
+                        context,
+                        mobileColumns: 1,
+                        tabletColumns: 2,
+                        desktopColumns: 3,
+                        largeDesktopColumns: 4,
                       );
+
+                      final spacing = ResponsiveUtils.isMobile(context)
+                          ? 12.0
+                          : 16.0;
 
                       return GridView.builder(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.2,
+                          crossAxisSpacing: spacing,
+                          mainAxisSpacing: spacing,
+                          childAspectRatio: ResponsiveUtils.isMobile(context)
+                              ? 1.5
+                              : 1.2,
                         ),
                         itemCount: tournaments.length,
                         itemBuilder: (context, index) {
@@ -110,16 +130,9 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     );
   }
 
-  int _getCrossAxisCount(double width) {
-    if (width > 1200) return 4;
-    if (width > 800) return 3;
-    if (width > 600) return 2;
-    return 1;
-  }
-
   Widget _buildTournamentCard(String tournamentId, Map<String, dynamic> data) {
     return Card(
-      elevation: 2,
+      elevation: ResponsiveUtils.getCardElevation(context),
       child: InkWell(
         onTap: () {
           Navigator.push(

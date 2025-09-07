@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 import '../utils/time_formatter.dart';
+import '../utils/responsive_utils.dart';
 
 /// Tournament details screen with team and pigeon management
 class TournamentDetailsScreen extends StatefulWidget {
@@ -249,58 +250,127 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
               const SizedBox(height: 12),
               Table(
                 border: TableBorder.all(color: Colors.grey[300]!),
-                columnWidths: const {
-                  0: FlexColumnWidth(0.5),
-                  1: FlexColumnWidth(2),
-                  2: FlexColumnWidth(1.5),
-                  3: FlexColumnWidth(1.5),
-                  4: FlexColumnWidth(1.5),
-                  5: FixedColumnWidth(60),
-                },
+                columnWidths: ResponsiveUtils.isMobile(context)
+                    ? const {
+                        0: FlexColumnWidth(0.4),
+                        1: FlexColumnWidth(2),
+                        2: FlexColumnWidth(1.2),
+                        3: FlexColumnWidth(1.2),
+                        4: FlexColumnWidth(1.2),
+                        5: FixedColumnWidth(40),
+                      }
+                    : const {
+                        0: FlexColumnWidth(0.5),
+                        1: FlexColumnWidth(2),
+                        2: FlexColumnWidth(1.5),
+                        3: FlexColumnWidth(1.5),
+                        4: FlexColumnWidth(1.5),
+                        5: FixedColumnWidth(60),
+                      },
                 children: [
                   TableRow(
                     decoration: BoxDecoration(color: Colors.grey[100]),
-                    children: const [
+                    children: [
                       Padding(
-                        padding: EdgeInsets.all(12),
+                        padding: ResponsiveUtils.getResponsivePadding(
+                          context,
+                          mobile: const EdgeInsets.all(8),
+                          desktop: const EdgeInsets.all(12),
+                        ),
                         child: Text(
                           '#',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: ResponsiveUtils.isMobile(context)
+                                ? 11
+                                : 14,
+                          ),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.all(12),
+                        padding: ResponsiveUtils.getResponsivePadding(
+                          context,
+                          mobile: const EdgeInsets.all(8),
+                          desktop: const EdgeInsets.all(12),
+                        ),
                         child: Text(
                           'Pigeon Name',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: ResponsiveUtils.isMobile(context)
+                                ? 11
+                                : 14,
+                          ),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.all(12),
+                        padding: ResponsiveUtils.getResponsivePadding(
+                          context,
+                          mobile: const EdgeInsets.all(8),
+                          desktop: const EdgeInsets.all(12),
+                        ),
                         child: Text(
-                          'Start Time',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          ResponsiveUtils.isMobile(context)
+                              ? 'Start'
+                              : 'Start Time',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: ResponsiveUtils.isMobile(context)
+                                ? 11
+                                : 14,
+                          ),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.all(12),
+                        padding: ResponsiveUtils.getResponsivePadding(
+                          context,
+                          mobile: const EdgeInsets.all(8),
+                          desktop: const EdgeInsets.all(12),
+                        ),
                         child: Text(
-                          'End Time',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          ResponsiveUtils.isMobile(context)
+                              ? 'End'
+                              : 'End Time',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: ResponsiveUtils.isMobile(context)
+                                ? 11
+                                : 14,
+                          ),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.all(12),
+                        padding: ResponsiveUtils.getResponsivePadding(
+                          context,
+                          mobile: const EdgeInsets.all(8),
+                          desktop: const EdgeInsets.all(12),
+                        ),
                         child: Text(
-                          'Total Time',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          ResponsiveUtils.isMobile(context)
+                              ? 'Total'
+                              : 'Total Time',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: ResponsiveUtils.isMobile(context)
+                                ? 11
+                                : 14,
+                          ),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.all(12),
+                        padding: ResponsiveUtils.getResponsivePadding(
+                          context,
+                          mobile: const EdgeInsets.all(4),
+                          desktop: const EdgeInsets.all(12),
+                        ),
                         child: Text(
-                          'Action',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          '',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: ResponsiveUtils.isMobile(context)
+                                ? 11
+                                : 14,
+                          ),
                         ),
                       ),
                     ],
@@ -313,15 +383,41 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                     return TableRow(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text('${index + 1}'),
+                          padding: ResponsiveUtils.getResponsivePadding(
+                            context,
+                            mobile: const EdgeInsets.all(8),
+                            desktop: const EdgeInsets.all(12),
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontSize: ResponsiveUtils.isMobile(context)
+                                  ? 11
+                                  : 14,
+                            ),
+                          ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(pigeonData['name'] ?? 'Unnamed Pigeon'),
+                          padding: ResponsiveUtils.getResponsivePadding(
+                            context,
+                            mobile: const EdgeInsets.all(8),
+                            desktop: const EdgeInsets.all(12),
+                          ),
+                          child: Text(
+                            pigeonData['name'] ?? 'Unnamed Pigeon',
+                            style: TextStyle(
+                              fontSize: ResponsiveUtils.isMobile(context)
+                                  ? 11
+                                  : 14,
+                            ),
+                          ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(8),
+                          padding: ResponsiveUtils.getResponsivePadding(
+                            context,
+                            mobile: const EdgeInsets.all(4),
+                            desktop: const EdgeInsets.all(8),
+                          ),
                           child: _buildTimeButton(
                             pigeon.id,
                             pigeonData['startTime'],
@@ -330,7 +426,11 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(8),
+                          padding: ResponsiveUtils.getResponsivePadding(
+                            context,
+                            mobile: const EdgeInsets.all(4),
+                            desktop: const EdgeInsets.all(8),
+                          ),
                           child: _buildTimeButton(
                             pigeon.id,
                             pigeonData['endTime'],
@@ -339,21 +439,36 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(12),
+                          padding: ResponsiveUtils.getResponsivePadding(
+                            context,
+                            mobile: const EdgeInsets.all(8),
+                            desktop: const EdgeInsets.all(12),
+                          ),
                           child: Text(
                             _calculateTotalTime(
                               pigeonData['startTime'],
                               pigeonData['endTime'],
                             ),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: ResponsiveUtils.isMobile(context)
+                                  ? 11
+                                  : 14,
+                            ),
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(8),
+                          padding: ResponsiveUtils.getResponsivePadding(
+                            context,
+                            mobile: const EdgeInsets.all(2),
+                            desktop: const EdgeInsets.all(8),
+                          ),
                           child: IconButton(
                             onPressed: () => _deletePigeon(pigeon.id),
                             icon: const Icon(Icons.delete, color: Colors.red),
-                            iconSize: 20,
+                            iconSize: ResponsiveUtils.isMobile(context)
+                                ? 16
+                                : 20,
                             tooltip: 'Delete Pigeon',
                           ),
                         ),
@@ -738,9 +853,9 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
   Widget _buildResultsDialog(List<TeamResult> teamResults) {
     return Dialog(
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(24),
+        width: ResponsiveUtils.getResponsiveWidth(context),
+        height: ResponsiveUtils.getResponsiveHeight(context),
+        padding: ResponsiveUtils.getResponsivePadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
