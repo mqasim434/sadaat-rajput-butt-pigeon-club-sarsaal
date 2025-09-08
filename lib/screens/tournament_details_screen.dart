@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../utils/time_formatter.dart';
 import '../utils/responsive_utils.dart';
+import '../services/pdf_service.dart';
 
 /// Tournament details screen with team and pigeon management
 class TournamentDetailsScreen extends StatefulWidget {
@@ -823,6 +824,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
 
       teamResults.add(
         TeamResult(
+          teamId: teamDoc.id,
           teamName: teamData['name'] ?? 'Unnamed Team',
           captain: teamData['captain'] ?? 'No captain',
           totalTime: totalTeamTime,
@@ -866,9 +868,22 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                   'Tournament Results',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: () => _downloadResultsPdf(teamResults),
+                      icon: const Icon(
+                        Icons.download,
+                        color: AppColors.primary,
+                      ),
+                      tooltip: 'Download PDF Results',
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1020,6 +1035,101 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
     );
   }
 
+  Future<void> _downloadResultsPdf(List<TeamResult> teamResults) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Generating PDF...'),
+            ],
+          ),
+        ),
+      );
+
+      // Get tournament data
+      final tournamentDoc = await _firestore
+          .collection('tournaments')
+          .doc(widget.tournamentId)
+          .get();
+
+      if (!tournamentDoc.exists) {
+        throw Exception('Tournament not found');
+      }
+
+      final tournamentData = tournamentDoc.data()!;
+
+      // Get detailed pigeon data for each team
+      final Map<String, List<PigeonResult>> teamPigeons = {};
+
+      for (var teamResult in teamResults) {
+        final pigeonsSnapshot = await _firestore
+            .collection('pigeons')
+            .where('teamId', isEqualTo: teamResult.teamId)
+            .get();
+
+        teamPigeons[teamResult.teamId] = pigeonsSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return PigeonResult(
+            name: data['name'] ?? 'Unnamed Pigeon',
+            startTime: data['startTime'],
+            endTime: data['endTime'],
+            flightTime: _calculateTotalTime(data['startTime'], data['endTime']),
+          );
+        }).toList();
+      }
+
+      // Convert local TeamResult to PDF service TeamResult
+      final pdfTeamResults = teamResults
+          .map(
+            (team) => PdfTeamResult(
+              teamId: team.teamId,
+              teamName: team.teamName,
+              captain: team.captain,
+              totalTime: team.totalTime,
+              totalPigeons: team.totalPigeons,
+              completedFlights: team.completedFlights,
+            ),
+          )
+          .toList();
+
+      // Generate and download PDF
+      await PdfService.downloadTournamentPdf(
+        tournamentId: widget.tournamentId,
+        tournamentData: tournamentData,
+        teamResults: pdfTeamResults,
+        teamPigeons: teamPigeons,
+      );
+
+      // Hide loading indicator
+      Navigator.pop(context);
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PDF generated successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      // Hide loading indicator
+      Navigator.pop(context);
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error generating PDF: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
@@ -1036,6 +1146,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
 }
 
 class TeamResult {
+  final String teamId;
   final String teamName;
   final String captain;
   final Duration totalTime;
@@ -1043,6 +1154,7 @@ class TeamResult {
   final int completedFlights;
 
   TeamResult({
+    required this.teamId,
     required this.teamName,
     required this.captain,
     required this.totalTime,

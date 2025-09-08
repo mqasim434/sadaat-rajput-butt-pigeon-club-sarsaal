@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 import '../utils/time_formatter.dart';
+import '../services/pdf_service.dart';
 
 /// Results screen showing all tournaments with expandable teams and pigeons
 class ResultsScreen extends StatefulWidget {
@@ -120,6 +121,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
+        ),
+        trailing: IconButton(
+          onPressed: () => _downloadTournamentPdf(tournamentId, tournamentData),
+          icon: const Icon(Icons.download, color: AppColors.primary),
+          tooltip: 'Download PDF Results',
         ),
         children: [_buildTournamentResults(tournamentId)],
       ),
@@ -478,6 +484,95 @@ class _ResultsScreenState extends State<ResultsScreen> {
     });
 
     return teamResults;
+  }
+
+  Future<void> _downloadTournamentPdf(
+    String tournamentId,
+    Map<String, dynamic> tournamentData,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Generating PDF...'),
+            ],
+          ),
+        ),
+      );
+
+      // Calculate team results for PDF
+      final teamResults = await _calculateTournamentResults(tournamentId);
+
+      // Get detailed pigeon data for each team
+      final Map<String, List<PigeonResult>> teamPigeons = {};
+
+      for (var teamResult in teamResults) {
+        final pigeonsSnapshot = await _firestore
+            .collection('pigeons')
+            .where('teamId', isEqualTo: teamResult.teamId)
+            .get();
+
+        teamPigeons[teamResult.teamId] = pigeonsSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return PigeonResult(
+            name: data['name'] ?? 'Unnamed Pigeon',
+            startTime: data['startTime'],
+            endTime: data['endTime'],
+            flightTime: _calculateTotalTime(data['startTime'], data['endTime']),
+          );
+        }).toList();
+      }
+
+      // Convert to PDF service TeamResult format
+      final pdfTeamResults = teamResults
+          .map(
+            (team) => PdfTeamResult(
+              teamId: team.teamId,
+              teamName: team.teamName,
+              captain: team.captain,
+              totalTime: team.totalTime,
+              totalPigeons: team.totalPigeons,
+              completedFlights: team.completedFlights,
+            ),
+          )
+          .toList();
+
+      // Generate and download PDF
+      await PdfService.downloadTournamentPdf(
+        tournamentId: tournamentId,
+        tournamentData: tournamentData,
+        teamResults: pdfTeamResults,
+        teamPigeons: teamPigeons,
+      );
+
+      // Hide loading indicator
+      Navigator.pop(context);
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PDF generated successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      // Hide loading indicator
+      Navigator.pop(context);
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error generating PDF: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   String _formatDate(dynamic date) {
