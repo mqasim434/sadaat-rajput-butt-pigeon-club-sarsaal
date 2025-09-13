@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../constants/app_colors.dart';
 import '../models/tournament.dart';
 import '../models/team.dart';
 import '../models/pigeon.dart';
+import 'public_results_screen.dart';
 
 class ResultsScreen extends StatefulWidget {
   final String? preSelectedTournamentId;
@@ -44,8 +46,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           .get();
 
       final tournaments = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Tournament.fromJson({'id': doc.id, ...data});
+        return Tournament.fromJson({'id': doc.id, ...doc.data()});
       }).toList();
 
       setState(() {
@@ -91,10 +92,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           .get();
 
       final teams = snapshot.docs.map((doc) {
-        return Team.fromJson({
-          'id': doc.id,
-          ...doc.data() as Map<String, dynamic>,
-        });
+        return Team.fromJson({'id': doc.id, ...doc.data()});
       }).toList();
 
       setState(() {
@@ -122,6 +120,71 @@ class _ResultsScreenState extends State<ResultsScreen> {
     setState(() {
       _selectedDay = day;
     });
+  }
+
+  void _generateShareableLink() {
+    if (_selectedTournamentId == null) return;
+
+    // Generate the public results URL
+    final baseUrl =
+        'https://sadaat-rajput-butt-pigeon-club-sars-inky.vercel.app/'; // Replace with your actual domain
+    final publicUrl =
+        '$baseUrl/public-results?tournament=$_selectedTournamentId';
+
+    // Copy to clipboard
+    Clipboard.setData(ClipboardData(text: publicUrl));
+
+    // Show confirmation dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Public Link Generated'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'The public results link has been copied to your clipboard:',
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: SelectableText(
+                publicUrl,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Anyone with this link can view the tournament results without logging in.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      PublicResultsScreen(tournamentId: _selectedTournamentId),
+                ),
+              );
+            },
+            child: const Text('View Public Results'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatDuration(Duration duration) {
@@ -153,6 +216,14 @@ class _ResultsScreenState extends State<ResultsScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          if (_selectedTournamentId != null)
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: _generateShareableLink,
+              tooltip: 'Generate Public Link',
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -762,7 +833,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       for (final pigeonDoc in pigeonsSnapshot.docs) {
         final pigeon = Pigeon.fromJson({
           'id': pigeonDoc.id,
-          ...pigeonDoc.data() as Map<String, dynamic>,
+          ...pigeonDoc.data(),
         });
 
         if (pigeon.isHelper) {

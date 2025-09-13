@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pigeon_track/constants/app_strings.dart';
 import '../constants/app_colors.dart';
 import '../services/auth_service.dart';
 import '../models/login_request.dart';
@@ -105,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               child: Image.network(
-                'https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
+                'https://www.aljazeera.com/wp-content/uploads/2022/07/AP22178310836751.jpg?resize=1170%2C780&quality=80',
                 width: double.infinity,
                 height: double.infinity,
                 fit: BoxFit.cover,
@@ -179,7 +180,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : 16,
                             ),
                             Text(
-                              'Pigeon Track',
+                              AppStrings.appTitle,
+                              textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize:
                                     MediaQuery.of(context).size.width < 600
