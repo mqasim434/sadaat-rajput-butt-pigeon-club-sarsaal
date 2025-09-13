@@ -1,18 +1,9 @@
 import 'package:flutter/material.dart';
-
 import '../constants/app_colors.dart';
-import '../constants/app_constants.dart';
-import '../constants/app_strings.dart';
-import '../models/login_request.dart';
 import '../services/auth_service.dart';
-import '../services/exceptions.dart';
-import '../widgets/background_container.dart';
-import '../widgets/custom_button.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/login_form_card.dart';
+import '../models/login_request.dart';
 import 'main_dashboard_screen.dart';
 
-/// Login screen widget with form validation and authentication
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -24,10 +15,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthService();
-
-  bool _isPasswordVisible = false;
+  final AuthService _authService = AuthService();
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -36,48 +26,44 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final request = LoginRequest(
-        username: _usernameController.text.trim(),
-        password: _passwordController.text,
+      final result = await _authService.login(
+        LoginRequest(
+          username: _usernameController.text.trim(),
+          password: _passwordController.text.trim(),
+        ),
       );
 
-      final result = await _authService.login(request);
-
-      if (!mounted) return;
-
-      if (result.success) {
-        // Navigate directly to dashboard on successful login
-        Navigator.of(context).pushReplacement(
+      if (result.success && mounted) {
+        Navigator.pushReplacement(
+          context,
           MaterialPageRoute(builder: (context) => const MainDashboardScreen()),
         );
       } else {
-        _showErrorDialog(result.errorMessage ?? AppStrings.loginFailedMessage);
-      }
-    } on AuthenticationException catch (e) {
-      if (mounted) {
-        _showErrorDialog(e.message);
-      }
-    } on ValidationException catch (e) {
-      if (mounted) {
-        _showErrorDialog(e.message);
-      }
-    } on AppException {
-      if (mounted) {
-        _showErrorDialog('Authentication failed. Please try again.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.errorMessage ?? 'Login failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        _showErrorDialog('An unexpected error occurred. Please try again.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Login failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -88,128 +74,238 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(AppStrings.loginFailedTitle),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text(AppStrings.okButton),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildAppHeader() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(AppConstants.paddingMedium),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.primary.withOpacity(AppColors.infoBoxOpacity),
-          ),
-          child: const Icon(
-            Icons.pets,
-            size: AppConstants.iconSize,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          AppStrings.appTitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          AppStrings.welcomeBack,
-          style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoginForm() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        children: [
-          CustomTextField(
-            controller: _usernameController,
-            labelText: AppStrings.username,
-            prefixIcon: Icons.person,
-            keyboardType: TextInputType.text,
-            textInputAction: TextInputAction.next,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return AppStrings.usernameRequired;
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 20),
-          CustomTextField(
-            controller: _passwordController,
-            labelText: AppStrings.password,
-            prefixIcon: Icons.lock,
-            obscureText: !_isPasswordVisible,
-            textInputAction: TextInputAction.done,
-            onEditingComplete: _handleLogin,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-              ),
-              onPressed: () {
-                setState(() {
-                  _isPasswordVisible = !_isPasswordVisible;
-                });
-              },
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return AppStrings.passwordRequired;
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 30),
-          CustomButton(
-            text: AppStrings.loginButton,
-            onPressed: _handleLogin,
-            isLoading: _isLoading,
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: BackgroundContainer(
-        backgroundImageUrl: AppConstants.backgroundImageUrl,
-        child: LoginFormCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildAppHeader(),
-              const SizedBox(height: 40),
-              _buildLoginForm(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.primary.withOpacity(0.3),
+              AppColors.primary.withOpacity(0.1),
+              Colors.white.withOpacity(0.8),
             ],
           ),
+        ),
+        child: Stack(
+          children: [
+            // Full-width pigeon background image
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.primary.withOpacity(0.3),
+                    AppColors.primary.withOpacity(0.1),
+                    Colors.white.withOpacity(0.8),
+                  ],
+                ),
+              ),
+              child: Image.network(
+                'https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  // Fallback to a different pigeon image
+                  return Image.network(
+                    'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
+                    width: double.infinity,
+                    height: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      // If both images fail, show gradient background
+                      return Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppColors.primary.withOpacity(0.3),
+                              AppColors.primary.withOpacity(0.1),
+                              Colors.white.withOpacity(0.8),
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.pets,
+                            size: 100,
+                            color: AppColors.primary.withOpacity(0.3),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            // Content
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 400, // Fixed small width for desktop
+                  ),
+                  child: Card(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(
+                        MediaQuery.of(context).size.width < 600 ? 24.0 : 32.0,
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Logo/Title
+                            Icon(
+                              Icons.emoji_events,
+                              size: MediaQuery.of(context).size.width < 600
+                                  ? 56
+                                  : 64,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(
+                              height: MediaQuery.of(context).size.width < 600
+                                  ? 12
+                                  : 16,
+                            ),
+                            Text(
+                              'Pigeon Track',
+                              style: TextStyle(
+                                fontSize:
+                                    MediaQuery.of(context).size.width < 600
+                                    ? 24
+                                    : 28,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            SizedBox(
+                              height: MediaQuery.of(context).size.width < 600
+                                  ? 6
+                                  : 8,
+                            ),
+                            Text(
+                              'Tournament Management System',
+                              style: TextStyle(
+                                fontSize:
+                                    MediaQuery.of(context).size.width < 600
+                                    ? 14
+                                    : 16,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Username Field
+                            TextFormField(
+                              controller: _usernameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Username',
+                                prefixIcon: Icon(Icons.person),
+                                border: OutlineInputBorder(),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your username';
+                                }
+                                return null;
+                              },
+                              onFieldSubmitted: (value) {
+                                FocusScope.of(context).nextFocus();
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Password Field
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                prefixIcon: const Icon(Icons.lock),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                                border: const OutlineInputBorder(),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your password';
+                                }
+                                return null;
+                              },
+                              onFieldSubmitted: (value) {
+                                _login();
+                              },
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Login Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: MediaQuery.of(context).size.width < 600
+                                  ? 44
+                                  : 48,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _login,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                    : Text(
+                                        'Login',
+                                        style: TextStyle(
+                                          fontSize:
+                                              MediaQuery.of(
+                                                    context,
+                                                  ).size.width <
+                                                  600
+                                              ? 14
+                                              : 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

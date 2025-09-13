@@ -21,7 +21,51 @@ class PdfService {
   }) async {
     final pdf = pw.Document();
 
-    // Add tournament results page
+    // Check if it's a multi-day tournament
+    final isMultiDay =
+        tournamentData['numberOfDays'] != null &&
+        tournamentData['numberOfDays'] > 1;
+
+    if (isMultiDay) {
+      return await _generateMultiDayTournamentPdf(
+        tournamentId: tournamentId,
+        tournamentData: tournamentData,
+        teamResults: teamResults,
+        teamPigeons: teamPigeons,
+      );
+    } else {
+      // Add tournament results page
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(_marginAll),
+          build: (context) => [
+            _buildHeader(tournamentData),
+            pw.SizedBox(height: 20),
+            _buildTournamentInfo(tournamentData),
+            pw.SizedBox(height: 30),
+            _buildResultsTable(teamResults),
+            pw.SizedBox(height: 30),
+            ..._buildDetailedPdfTeamResults(teamResults, teamPigeons),
+          ],
+        ),
+      );
+
+      return pdf.save();
+    }
+  }
+
+  /// Generates a PDF report for multi-day tournaments
+  static Future<Uint8List> _generateMultiDayTournamentPdf({
+    required String tournamentId,
+    required Map<String, dynamic> tournamentData,
+    required List<PdfTeamResult> teamResults,
+    required Map<String, List<PigeonResult>> teamPigeons,
+  }) async {
+    final pdf = pw.Document();
+    final days = tournamentData['days'] as List<dynamic>? ?? [];
+
+    // Add cover page
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -31,12 +75,80 @@ class PdfService {
           pw.SizedBox(height: 20),
           _buildTournamentInfo(tournamentData),
           pw.SizedBox(height: 30),
-          _buildResultsTable(teamResults),
-          pw.SizedBox(height: 30),
-          ..._buildDetailedPdfTeamResults(teamResults, teamPigeons),
+          pw.Text(
+            'Multi-Day Tournament Results',
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Text(
+            'This tournament spans ${tournamentData['numberOfDays']} days:',
+            style: const pw.TextStyle(fontSize: 14),
+          ),
+          pw.SizedBox(height: 10),
+          ...days.map<pw.Widget>((dayData) {
+            final dayNumber = dayData['dayNumber'] as int;
+            final dayDate = dayData['date'] as Timestamp;
+            return pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 8),
+              child: pw.Text(
+                'Day $dayNumber: ${dayDate.toDate().day}/${dayDate.toDate().month}/${dayDate.toDate().year}',
+                style: const pw.TextStyle(fontSize: 12),
+              ),
+            );
+          }).toList(),
         ],
       ),
     );
+
+    // Add results for each day
+    for (final dayData in days) {
+      final dayNumber = dayData['dayNumber'] as int;
+      final dayDate = dayData['date'] as Timestamp;
+
+      // Filter team results for this day
+      final dayTeamResults = teamResults
+          .where((result) => result.day == dayNumber)
+          .toList();
+      final dayTeamPigeons = <String, List<PigeonResult>>{};
+
+      // Filter pigeon results for this day
+      teamPigeons.forEach((teamId, pigeons) {
+        // This would need to be filtered based on day - you might need to modify the data structure
+        dayTeamPigeons[teamId] = pigeons;
+      });
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(_marginAll),
+          build: (context) => [
+            pw.Text(
+              'Day $dayNumber Results',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Text(
+              'Date: ${dayDate.toDate().day}/${dayDate.toDate().month}/${dayDate.toDate().year}',
+              style: const pw.TextStyle(fontSize: 12),
+            ),
+            pw.SizedBox(height: 20),
+            if (dayTeamResults.isNotEmpty) ...[
+              _buildResultsTable(dayTeamResults),
+              pw.SizedBox(height: 30),
+              ..._buildDetailedPdfTeamResults(dayTeamResults, dayTeamPigeons),
+            ] else ...[
+              pw.Text(
+                'No teams participated on this day',
+                style: pw.TextStyle(
+                  fontSize: 12,
+                  fontStyle: pw.FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return pdf.save();
   }
@@ -428,6 +540,7 @@ class PdfTeamResult {
   final Duration totalTime;
   final int totalPigeons;
   final int completedFlights;
+  final int day;
 
   PdfTeamResult({
     required this.teamId,
@@ -436,6 +549,7 @@ class PdfTeamResult {
     required this.totalTime,
     required this.totalPigeons,
     required this.completedFlights,
+    required this.day,
   });
 }
 
