@@ -503,7 +503,11 @@ class PdfService {
 
   /// Formats date and time for display
   static String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    final hour12 = dateTime.hour == 0
+        ? 12
+        : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
+    final amPm = dateTime.hour < 12 ? 'AM' : 'PM';
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${hour12.toString()}:${dateTime.minute.toString().padLeft(2, '0')} $amPm';
   }
 
   /// Formats time for display
@@ -511,7 +515,11 @@ class PdfService {
     if (time == null) return '--';
     if (time is Timestamp) {
       final dateTime = time.toDate();
-      return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+      final hour12 = dateTime.hour == 0
+          ? 12
+          : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
+      final amPm = dateTime.hour < 12 ? 'AM' : 'PM';
+      return '${hour12.toString()}:${dateTime.minute.toString().padLeft(2, '0')} $amPm';
     }
     return '--';
   }

@@ -6,7 +6,6 @@ import 'constants/app_strings.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_dashboard_screen.dart';
-import 'screens/public_results_screen.dart';
 import 'services/auth_service.dart';
 
 /// Entry point of the Sadaat Rajput Butt Pigeon Club Sarsaal application
@@ -62,18 +61,7 @@ class _PigeonTrackAppState extends State<PigeonTrackApp> {
           : _authService.isAuthenticated
           ? const MainDashboardScreen()
           : const LoginScreen(),
-      routes: {'/public-results': (context) => const PublicResultsScreen()},
-      onGenerateRoute: (settings) {
-        if (settings.name == '/public-results') {
-          final args = settings.arguments as Map<String, dynamic>?;
-          final tournamentId = args?['tournamentId'] as String?;
-          return MaterialPageRoute(
-            builder: (context) =>
-                PublicResultsScreen(tournamentId: tournamentId),
-          );
-        }
-        return null;
-      },
+
       debugShowCheckedModeBanner: false,
     );
   }

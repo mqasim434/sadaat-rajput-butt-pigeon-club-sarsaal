@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../constants/app_colors.dart';
 import '../models/team.dart';
 import '../models/pigeon.dart';
+import '../models/tournament.dart';
+import '../utils/time_formatter.dart';
 
 class TeamDetailsScreen extends StatefulWidget {
   final String teamId;
@@ -24,6 +26,13 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _pigeonNameController = TextEditingController();
   bool _isHelper = false;
+  Tournament? _tournament;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTournament();
+  }
 
   @override
   void dispose() {
@@ -31,7 +40,29 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
     super.dispose();
   }
 
+  Future<void> _loadTournament() async {
+    try {
+      final doc = await _firestore
+          .collection('tournaments')
+          .doc(widget.tournamentId)
+          .get();
+
+      if (doc.exists) {
+        final tournament = Tournament.fromJson({'id': doc.id, ...doc.data()!});
+
+        setState(() {
+          _tournament = tournament;
+        });
+      }
+    } catch (e) {
+      print('Error loading tournament: $e');
+    }
+  }
+
   Future<void> _showAddPigeonDialog() async {
+    // Always refresh tournament data before opening dialog
+    await _loadTournament();
+
     _pigeonNameController.clear();
     _isHelper = false;
 
@@ -62,6 +93,71 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
                 },
                 controlAffinity: ListTileControlAffinity.leading,
               ),
+
+              // Day Start Time Info
+              if (_tournament != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Day ${widget.selectedDay} Start Time',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _tournament!.days
+                                          .firstWhere(
+                                            (d) =>
+                                                d.dayNumber ==
+                                                widget.selectedDay,
+                                            orElse: () =>
+                                                _tournament!.days.first,
+                                          )
+                                          .startTime !=
+                                      null
+                                  ? _formatTime(
+                                      _tournament!.days
+                                          .firstWhere(
+                                            (d) =>
+                                                d.dayNumber ==
+                                                widget.selectedDay,
+                                            orElse: () =>
+                                                _tournament!.days.first,
+                                          )
+                                          .startTime!,
+                                    )
+                                  : 'Not set - will be added without start time',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           actions: <Widget>[
@@ -96,6 +192,41 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
     }
 
     try {
+      // Get day's start time if available
+      List<Flight> initialFlights = [];
+      if (_tournament != null) {
+        final tournamentDay = _tournament!.days.firstWhere(
+          (d) => d.dayNumber == widget.selectedDay,
+          orElse: () => _tournament!.days.first,
+        );
+
+        if (tournamentDay.startTime != null) {
+          print(
+            'DEBUG: Adding new pigeon with start time: ${tournamentDay.startTime}',
+          );
+          initialFlights.add(
+            Flight(
+              id: '',
+              pigeonId: '', // Will be set after creating the pigeon document
+              teamId: widget.teamId,
+              tournamentId: widget.tournamentId,
+              day: widget.selectedDay,
+              takeoffTime: tournamentDay.startTime!,
+              landingTime: null,
+              flightDuration: Duration.zero,
+              notes: '',
+              createdAt: DateTime.now(),
+            ),
+          );
+        } else {
+          print('DEBUG: No start time set for day ${widget.selectedDay}');
+        }
+      } else {
+        print(
+          'DEBUG: Tournament data not loaded, adding pigeon without flight',
+        );
+      }
+
       final pigeon = Pigeon(
         id: '',
         teamId: widget.teamId,
@@ -103,7 +234,7 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
         name: _pigeonNameController.text.trim(),
         isHelper: _isHelper,
         day: widget.selectedDay, // Use selected day
-        flights: [],
+        flights: initialFlights,
         createdAt: DateTime.now(),
       );
 
@@ -111,8 +242,12 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pigeon added successfully!'),
+          SnackBar(
+            content: Text(
+              initialFlights.isNotEmpty
+                  ? 'Pigeon added with start time!'
+                  : 'Pigeon added successfully!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -429,8 +564,7 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
   }
 
   String _formatTime(DateTime? time) {
-    if (time == null) return 'Not set';
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    return TimeFormatter.formatDateTime12Hour(time);
   }
 
   Flight? _getLatestFlight(Pigeon pigeon) {
@@ -439,11 +573,26 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
   }
 
   Future<void> _showEditPigeonDialog(Pigeon pigeon) async {
+    // Refresh tournament data to get latest start times
+    await _loadTournament();
+
     _pigeonNameController.text = pigeon.name;
     _isHelper = pigeon.isHelper;
     final latestFlight = _getLatestFlight(pigeon);
     DateTime? takeoffTime = latestFlight?.takeoffTime;
     DateTime? landingTime = latestFlight?.landingTime;
+
+    // Auto-assign day's start time if no existing flight and tournament has start time
+    if (takeoffTime == null && _tournament != null) {
+      final tournamentDay = _tournament!.days.firstWhere(
+        (d) => d.dayNumber == widget.selectedDay,
+        orElse: () => _tournament!.days.first,
+      );
+
+      if (tournamentDay.startTime != null) {
+        takeoffTime = tournamentDay.startTime!;
+      }
+    }
 
     return showDialog<void>(
       context: context,
@@ -490,6 +639,75 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+
+                    // Day Start Time Info
+                    if (_tournament != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Day ${widget.selectedDay} Start Time',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _tournament!.days
+                                                .firstWhere(
+                                                  (d) =>
+                                                      d.dayNumber ==
+                                                      widget.selectedDay,
+                                                  orElse: () =>
+                                                      _tournament!.days.first,
+                                                )
+                                                .startTime !=
+                                            null
+                                        ? _formatTime(
+                                            _tournament!.days
+                                                .firstWhere(
+                                                  (d) =>
+                                                      d.dayNumber ==
+                                                      widget.selectedDay,
+                                                  orElse: () =>
+                                                      _tournament!.days.first,
+                                                )
+                                                .startTime!,
+                                          )
+                                        : 'Not set',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Takeoff Time
                     ListTile(

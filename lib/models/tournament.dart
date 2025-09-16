@@ -74,11 +74,13 @@ class TournamentDay {
   final int dayNumber;
   final DateTime date;
   final bool isActive;
+  final DateTime? startTime;
 
   TournamentDay({
     required this.dayNumber,
     required this.date,
     this.isActive = false,
+    this.startTime,
   });
 
   factory TournamentDay.fromJson(Map<String, dynamic> json) {
@@ -86,6 +88,9 @@ class TournamentDay {
       dayNumber: json['dayNumber'] ?? 1,
       date: (json['date'] as Timestamp).toDate(),
       isActive: json['isActive'] ?? false,
+      startTime: json['startTime'] != null
+          ? (json['startTime'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -94,6 +99,7 @@ class TournamentDay {
       'dayNumber': dayNumber,
       'date': Timestamp.fromDate(date),
       'isActive': isActive,
+      'startTime': startTime != null ? Timestamp.fromDate(startTime!) : null,
     };
   }
 }

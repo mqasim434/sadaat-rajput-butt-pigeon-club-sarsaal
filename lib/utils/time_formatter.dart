@@ -23,6 +23,12 @@ class TimeFormatter {
   }
 
   /// Formats DateTime to 12-hour format (e.g., "2:30 PM")
+  static String formatDateTime12Hour(DateTime? dateTime) {
+    if (dateTime == null) return 'Not set';
+    return _formatDateTime12Hour(dateTime);
+  }
+
+  /// Formats DateTime to 12-hour format (e.g., "2:30 PM")
   static String _formatDateTime12Hour(DateTime dateTime) {
     final hour12 = dateTime.hour == 0
         ? 12
