@@ -192,8 +192,27 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
     }
 
     try {
-      // Get day's start time if available
-      List<Flight> initialFlights = [];
+      // First create the pigeon without flights
+      final pigeon = Pigeon(
+        id: '',
+        teamId: widget.teamId,
+        tournamentId: widget.tournamentId,
+        name: _pigeonNameController.text.trim(),
+        isHelper: _isHelper,
+        day: widget.selectedDay, // Use selected day
+        flights: [], // Start with empty flights
+        createdAt: DateTime.now(),
+      );
+
+      // Create pigeon document in Firestore
+      final pigeonDocRef = await _firestore
+          .collection('pigeons')
+          .add(pigeon.toFirestoreJson());
+      final pigeonId = pigeonDocRef.id;
+      print('DEBUG: Created pigeon with ID: $pigeonId');
+
+      // Create initial flight if day has start time
+      bool hasInitialFlight = false;
       if (_tournament != null) {
         final tournamentDay = _tournament!.days.firstWhere(
           (d) => d.dayNumber == widget.selectedDay,
@@ -202,22 +221,49 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
 
         if (tournamentDay.startTime != null) {
           print(
-            'DEBUG: Adding new pigeon with start time: ${tournamentDay.startTime}',
+            'DEBUG: Adding initial flight with start time: ${tournamentDay.startTime}',
           );
-          initialFlights.add(
-            Flight(
-              id: '',
-              pigeonId: '', // Will be set after creating the pigeon document
-              teamId: widget.teamId,
-              tournamentId: widget.tournamentId,
-              day: widget.selectedDay,
-              takeoffTime: tournamentDay.startTime!,
-              landingTime: null,
-              flightDuration: Duration.zero,
-              notes: '',
-              createdAt: DateTime.now(),
-            ),
+
+          final initialFlight = Flight(
+            id: '',
+            pigeonId: pigeonId,
+            teamId: widget.teamId,
+            tournamentId: widget.tournamentId,
+            day: widget.selectedDay,
+            takeoffTime: tournamentDay.startTime!,
+            landingTime: null,
+            flightDuration: Duration.zero,
+            notes: '',
+            createdAt: DateTime.now(),
           );
+
+          // Create flight document in Firestore
+          final flightDocRef = await _firestore
+              .collection('flights')
+              .add(initialFlight.toFirestoreJson());
+          final flightId = flightDocRef.id;
+          print('DEBUG: Created flight with ID: $flightId');
+
+          // Create flight with proper ID
+          final flightWithId = Flight(
+            id: flightId,
+            pigeonId: pigeonId,
+            teamId: widget.teamId,
+            tournamentId: widget.tournamentId,
+            day: widget.selectedDay,
+            takeoffTime: tournamentDay.startTime!,
+            landingTime: null,
+            flightDuration: Duration.zero,
+            notes: '',
+            createdAt: DateTime.now(),
+          );
+
+          // Update pigeon document with the flight
+          await pigeonDocRef.update({
+            'flights': [flightWithId.toJson()],
+          });
+
+          hasInitialFlight = true;
         } else {
           print('DEBUG: No start time set for day ${widget.selectedDay}');
         }
@@ -227,24 +273,11 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
         );
       }
 
-      final pigeon = Pigeon(
-        id: '',
-        teamId: widget.teamId,
-        tournamentId: widget.tournamentId,
-        name: _pigeonNameController.text.trim(),
-        isHelper: _isHelper,
-        day: widget.selectedDay, // Use selected day
-        flights: initialFlights,
-        createdAt: DateTime.now(),
-      );
-
-      await _firestore.collection('pigeons').add(pigeon.toFirestoreJson());
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              initialFlights.isNotEmpty
+              hasInitialFlight
                   ? 'Pigeon added with start time!'
                   : 'Pigeon added successfully!',
             ),
@@ -479,10 +512,16 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
                             ),
                           ],
                           rows: pigeonsSnapshot.data!.docs.map((doc) {
+                            print(
+                              'DEBUG: Loading pigeon from doc ID: ${doc.id}',
+                            );
                             final pigeon = Pigeon.fromJson({
                               'id': doc.id,
                               ...doc.data() as Map<String, dynamic>,
                             });
+                            print(
+                              'DEBUG: Created pigeon object with ID: ${pigeon.id}',
+                            );
 
                             final latestFlight = _getLatestFlight(pigeon);
                             return DataRow(
@@ -819,6 +858,24 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
       return;
     }
 
+    // Validate pigeon ID
+    if (pigeon.id.isEmpty) {
+      print('ERROR: Pigeon ID is empty! Cannot update pigeon.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Error: Invalid pigeon data. Please refresh and try again.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    print('DEBUG: Updating pigeon with ID: ${pigeon.id}');
+
     try {
       // Update pigeon basic info
       await _firestore.collection('pigeons').doc(pigeon.id).update({
@@ -830,8 +887,10 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
       if (takeoffTime != null) {
         final latestFlight = _getLatestFlight(pigeon);
 
-        if (latestFlight != null) {
-          // Update existing flight
+        if (latestFlight != null && latestFlight.id.isNotEmpty) {
+          // Update existing flight that has a valid ID
+          print('DEBUG: Updating existing flight with ID: ${latestFlight.id}');
+
           final updatedFlight = Flight(
             id: latestFlight.id,
             pigeonId: pigeon.id,
@@ -866,7 +925,14 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
             'flights': updatedFlights.map((f) => f.toJson()).toList(),
           });
         } else {
-          // Create new flight
+          // Create new flight (either no flight exists, or flight has empty ID)
+          if (latestFlight != null && latestFlight.id.isEmpty) {
+            print(
+              'DEBUG: Found flight with empty ID, creating new flight instead',
+            );
+          } else {
+            print('DEBUG: No existing flight found, creating new flight');
+          }
           final newFlight = Flight(
             id: '',
             pigeonId: pigeon.id,
@@ -902,8 +968,15 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
           );
 
           // Update flight in pigeon's flights list
+          // First remove any existing flights for this day (especially ones with empty IDs)
           final updatedFlights = List<Flight>.from(pigeon.flights)
+            ..removeWhere((f) => f.day == widget.selectedDay)
             ..add(flightWithId);
+
+          print(
+            'DEBUG: Updated pigeon flights list, removed old flights for day ${widget.selectedDay}',
+          );
+
           await _firestore.collection('pigeons').doc(pigeon.id).update({
             'flights': updatedFlights.map((f) => f.toJson()).toList(),
           });
